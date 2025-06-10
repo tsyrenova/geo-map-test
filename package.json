@@ -1,6 +1,7 @@
 {
 	"name": "geo-map-test",
 	"version": "0.1.0",
+	"homepage": "./",
 	"private": true,
 	"dependencies": {
 		"@deck.gl/layers": "^9.1.12",
