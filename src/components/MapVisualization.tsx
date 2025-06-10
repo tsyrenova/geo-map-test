@@ -1,7 +1,7 @@
-import { FC } from "react";
+import { FC, useRef, useEffect } from "react";
 import Deck from "@deck.gl/react";
-import { ScatterplotLayer, PolygonLayer, ColumnLayer } from "@deck.gl/layers";
-import Map, { NavigationControl } from "react-map-gl/maplibre";
+import { ScatterplotLayer, PolygonLayer } from "@deck.gl/layers";
+import Map, { NavigationControl, MapRef } from "react-map-gl/maplibre";
 import maplibregl from "maplibre-gl";
 import { FeatureWithPolygon, FeatureWithPoint, ViewState } from "../types";
 import s from "./MapVisualization.module.css";
@@ -23,6 +23,56 @@ type Props = {
 
 export const MapVisualization: FC<Props> = ({ buildings, points, is3D, setIs3D }) => {
 	const layers = [];
+	const mapRef = useRef<MapRef | null>(null);
+
+	function pointToSquareMeter([lng, lat]: [number, number]): number[][] {
+		const dLat = 1 / 111320;
+		const dLng = 1 / (111320 * Math.cos((lat * Math.PI) / 180));
+		return [
+			[lng - dLng / 2, lat - dLat / 2],
+			[lng + dLng / 2, lat - dLat / 2],
+			[lng + dLng / 2, lat + dLat / 2],
+			[lng - dLng / 2, lat + dLat / 2],
+			[lng - dLng / 2, lat - dLat / 2],
+		];
+	}
+
+	const pointsGeojson = {
+		type: "FeatureCollection" as const,
+		features: points.map((f) => ({
+			type: "Feature" as const,
+			geometry: {
+				type: "Polygon" as const,
+				coordinates: [pointToSquareMeter(f.geometry.coordinates as [number, number])],
+			},
+			properties: {
+				height: 2,
+				color: "#ff0000",
+			},
+		})),
+	};
+
+	useEffect(() => {
+		if (!is3D || !mapRef.current) return;
+		const map = mapRef.current.getMap();
+		if (map.getLayer("points-3d-extrusion")) map.removeLayer("points-3d-extrusion");
+		if (map.getSource("points-3d")) map.removeSource("points-3d");
+		map.addSource("points-3d", {
+			type: "geojson",
+			data: pointsGeojson,
+		});
+		map.addLayer({
+			id: "points-3d-extrusion",
+			type: "fill-extrusion",
+			source: "points-3d",
+			paint: {
+				"fill-extrusion-color": "#ff0000",
+				"fill-extrusion-height": ["get", "height"],
+				"fill-extrusion-base": 0,
+				"fill-extrusion-opacity": 1,
+			},
+		});
+	}, [is3D, points]);
 
 	if (is3D) {
 		layers.push(
@@ -33,30 +83,11 @@ export const MapVisualization: FC<Props> = ({ buildings, points, is3D, setIs3D }
 				getPolygon: (f) => f.geometry.coordinates[0],
 				getElevation: (f) => Number(f.properties.AGL),
 				getFillColor: [0, 0, 0, 60],
-				getLineColor: [0, 0, 0, 80],
+				getLineColor: [0, 0, 0, 90],
 				getLineWidth: 1,
 				lineWidthMinPixels: 1,
 				pickable: true,
 				wireframe: false,
-				opacity: 0.25,
-			})
-		);
-		layers.push(
-			new ColumnLayer<FeatureWithPoint>({
-				id: "points-3d",
-				data: points,
-				diskResolution: 4,
-				radius: 1,
-				getPosition: (f) => [f.geometry.coordinates[0], f.geometry.coordinates[1], 0],
-				getElevation: 1.8,
-				getFillColor: [255, 0, 0, 255],
-				pickable: true,
-				extruded: true,
-				coverage: 1,
-				parameters: {
-					// @ts-ignore
-					depthTest: false,
-				},
 			})
 		);
 	} else {
@@ -78,7 +109,7 @@ export const MapVisualization: FC<Props> = ({ buildings, points, is3D, setIs3D }
 			new ScatterplotLayer<FeatureWithPoint>({
 				id: "points-2d",
 				data: points,
-				getPosition: (f) => [f.geometry.coordinates[0], f.geometry.coordinates[1], f.properties.height],
+				getPosition: (f) => [f.geometry.coordinates[0], f.geometry.coordinates[1]],
 				getRadius: 3,
 				getFillColor: [0, 0, 255, 200],
 				radiusUnits: "pixels",
@@ -103,7 +134,8 @@ export const MapVisualization: FC<Props> = ({ buildings, points, is3D, setIs3D }
 					mapStyle="https://tiles.stadiamaps.com/styles/osm_bright.json"
 					reuseMaps
 					style={{ width: "100%", height: "100%" }}
-					mapLib={maplibregl}>
+					mapLib={maplibregl}
+					ref={mapRef}>
 					<NavigationControl
 						position="top-right"
 						showCompass={false}
