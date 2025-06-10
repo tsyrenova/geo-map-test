@@ -53,25 +53,36 @@ export const MapVisualization: FC<Props> = ({ buildings, points, is3D, setIs3D }
 	};
 
 	useEffect(() => {
-		if (!is3D || !mapRef.current) return;
-		const map = mapRef.current.getMap();
-		if (map.getLayer("points-3d-extrusion")) map.removeLayer("points-3d-extrusion");
-		if (map.getSource("points-3d")) map.removeSource("points-3d");
-		map.addSource("points-3d", {
-			type: "geojson",
-			data: pointsGeojson,
-		});
-		map.addLayer({
-			id: "points-3d-extrusion",
-			type: "fill-extrusion",
-			source: "points-3d",
-			paint: {
-				"fill-extrusion-color": "#ff0000",
-				"fill-extrusion-height": ["get", "height"],
-				"fill-extrusion-base": 0,
-				"fill-extrusion-opacity": 1,
-			},
-		});
+		const map = mapRef.current?.getMap();
+		if (!map) return;
+
+		if (is3D) {
+			if (map.getLayer("points-3d-extrusion")) map.removeLayer("points-3d-extrusion");
+			if (map.getSource("points-3d")) map.removeSource("points-3d");
+			map.addSource("points-3d", {
+				type: "geojson",
+				data: pointsGeojson,
+			});
+			map.addLayer({
+				id: "points-3d-extrusion",
+				type: "fill-extrusion",
+				source: "points-3d",
+				paint: {
+					"fill-extrusion-color": "#ff0000",
+					"fill-extrusion-height": ["get", "height"],
+					"fill-extrusion-base": 0,
+					"fill-extrusion-opacity": 1,
+				},
+			});
+		} else {
+			if (map.getLayer("points-3d-extrusion")) map.removeLayer("points-3d-extrusion");
+			if (map.getSource("points-3d")) map.removeSource("points-3d");
+		}
+
+		return () => {
+			if (map.getLayer("points-3d-extrusion")) map.removeLayer("points-3d-extrusion");
+			if (map.getSource("points-3d")) map.removeSource("points-3d");
+		};
 	}, [is3D, points]);
 
 	if (is3D) {
