@@ -5,6 +5,7 @@ import Map, { NavigationControl, MapRef } from "react-map-gl/maplibre";
 import maplibregl from "maplibre-gl";
 import { FeatureWithPolygon, FeatureWithPoint, ViewState } from "../types";
 import s from "./MapVisualization.module.css";
+import { Position } from "geojson";
 
 const INITIAL_VIEW_STATE: ViewState = {
 	longitude: 30.2622,
@@ -21,11 +22,26 @@ type Props = {
 	setIs3D: (value: boolean) => void;
 };
 
+type PointsGeojson = {
+	type: "FeatureCollection";
+	features: {
+		type: "Feature";
+		geometry: {
+			type: "Polygon";
+			coordinates: number[][][];
+		};
+		properties: {
+			height: number;
+			color: string;
+		};
+	}[];
+};
+
 export const MapVisualization: FC<Props> = ({ buildings, points, is3D, setIs3D }) => {
 	const layers = [];
 	const mapRef = useRef<MapRef | null>(null);
 
-	function pointToSquareMeter([lng, lat]: [number, number]): number[][] {
+	function pointToSquareMeter([lng, lat]: Position): number[][] {
 		const dLat = 1 / 111320;
 		const dLng = 1 / (111320 * Math.cos((lat * Math.PI) / 180));
 		return [
@@ -37,13 +53,13 @@ export const MapVisualization: FC<Props> = ({ buildings, points, is3D, setIs3D }
 		];
 	}
 
-	const pointsGeojson = {
-		type: "FeatureCollection" as const,
-		features: points.map((f) => ({
-			type: "Feature" as const,
+	const pointsGeojson: PointsGeojson = {
+		type: "FeatureCollection",
+		features: points.map((point) => ({
+			type: "Feature",
 			geometry: {
-				type: "Polygon" as const,
-				coordinates: [pointToSquareMeter(f.geometry.coordinates as [number, number])],
+				type: "Polygon",
+				coordinates: [pointToSquareMeter(point.geometry.coordinates)],
 			},
 			properties: {
 				height: 2,
